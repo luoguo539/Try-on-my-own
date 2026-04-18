@@ -1,0 +1,10 @@
+fastapi
+uvicorn[standard]
+requests
+pydantic
+python-multipart
+packaging
+pydub
+httpx
+py7zr
+psutil

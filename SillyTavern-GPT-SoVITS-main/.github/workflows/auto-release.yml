@@ -1,0 +1,98 @@
+name: Auto Release
+
+on:
+  push:
+    branches:
+      - main_v1.3  # 临时改为当前分支以便测试
+      - main       # 保留 main 分支
+    paths:
+      - 'manifest.json'
+
+# 添加权限配置
+permissions:
+  contents: write  # 允许创建 Release 和 Tag
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 2  # 需要获取前一次提交以比较版本号
+      
+      - name: Get version from manifest.json
+        id: get_version
+        run: |
+          VERSION=$(jq -r '.version' manifest.json)
+          echo "version=$VERSION" >> $GITHUB_OUTPUT
+          echo "tag=v$VERSION" >> $GITHUB_OUTPUT
+      
+      - name: Check if version changed
+        id: check_version
+        run: |
+          # 获取上一次提交的版本号
+          git checkout HEAD~1 manifest.json 2>/dev/null || true
+          OLD_VERSION=$(jq -r '.version' manifest.json 2>/dev/null || echo "0.0.0")
+          git checkout HEAD manifest.json
+          
+          NEW_VERSION="${{ steps.get_version.outputs.version }}"
+          
+          echo "旧版本: $OLD_VERSION"
+          echo "新版本: $NEW_VERSION"
+          
+          if [ "$OLD_VERSION" != "$NEW_VERSION" ]; then
+            echo "changed=true" >> $GITHUB_OUTPUT
+          else
+            echo "changed=false" >> $GITHUB_OUTPUT
+          fi
+      
+      - name: Check if tag exists
+        id: check_tag
+        if: steps.check_version.outputs.changed == 'true'
+        run: |
+          TAG="${{ steps.get_version.outputs.tag }}"
+          if git rev-parse "$TAG" >/dev/null 2>&1; then
+            echo "exists=true" >> $GITHUB_OUTPUT
+            echo "⚠️ Tag $TAG 已存在"
+          else
+            echo "exists=false" >> $GITHUB_OUTPUT
+            echo "✅ Tag $TAG 不存在,可以创建"
+          fi
+      
+      - name: Generate release notes
+        id: release_notes
+        if: steps.check_version.outputs.changed == 'true' && steps.check_tag.outputs.exists == 'false'
+        run: |
+          # 获取最近的提交信息作为 Release Notes
+          NOTES=$(git log -1 --pretty=format:"%s%n%n%b")
+          
+          # 如果提交信息为空,使用默认信息
+          if [ -z "$NOTES" ]; then
+            NOTES="版本 ${{ steps.get_version.outputs.version }} 发布"
+          fi
+          
+          # 保存到文件(避免多行字符串问题)
+          echo "$NOTES" > release_notes.txt
+      
+      - name: Create Release
+        if: steps.check_version.outputs.changed == 'true' && steps.check_tag.outputs.exists == 'false'
+        uses: softprops/action-gh-release@v1
+        with:
+          tag_name: ${{ steps.get_version.outputs.tag }}
+          name: ${{ steps.get_version.outputs.tag }}
+          body_path: release_notes.txt
+          draft: false
+          prerelease: false
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      
+      - name: Summary
+        if: steps.check_version.outputs.changed == 'true'
+        run: |
+          if [ "${{ steps.check_tag.outputs.exists }}" == "true" ]; then
+            echo "⚠️ Tag ${{ steps.get_version.outputs.tag }} 已存在,跳过创建 Release"
+          else
+            echo "✅ 成功创建 Release: ${{ steps.get_version.outputs.tag }}"
+          fi

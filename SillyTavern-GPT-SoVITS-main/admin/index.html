@@ -1,0 +1,696 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>SillyTavern GPT-SoVITS 管理面板</title>
+    <link rel="stylesheet" href="css/admin.css">
+</head>
+
+<body>
+    <div class="container">
+        <!-- 侧边栏 -->
+        <aside class="sidebar">
+            <div class="logo">
+                <h1>🎙️ TTS 管理</h1>
+                <p class="version">v2.0.0</p>
+            </div>
+
+            <nav class="nav">
+                <a href="#dashboard" class="nav-item active" data-page="dashboard">
+                    <span class="icon">📊</span>
+                    <span>仪表盘</span>
+                    <span class="update-badge" id="nav-update-badge" style="display: none;"></span>
+                </a>
+                <a href="#models" class="nav-item" data-page="models">
+                    <span class="icon">🤖</span>
+                    <span>模型管理</span>
+                </a>
+                <a href="#audios" class="nav-item" data-page="audios">
+                    <span class="icon">🎵</span>
+                    <span>音频管理</span>
+                </a>
+                <a href="#settings" class="nav-item" data-page="settings">
+                    <span class="icon">⚙️</span>
+                    <span>系统配置</span>
+                </a>
+            </nav>
+        </aside>
+
+        <!-- 主内容区 -->
+        <main class="main-content">
+            <!-- 仪表盘页面 -->
+            <section id="dashboard" class="page active">
+                <header class="page-header">
+                    <h2>系统仪表盘</h2>
+                    <button class="btn btn-primary" onclick="refreshStatus()">🔄 刷新状态</button>
+                </header>
+
+                <div class="cards-grid">
+                    <!-- GPT-SoVITS 服务 -->
+                    <div class="card">
+                        <div class="card-header">
+                            <h3>🎙️ GPT-SoVITS 服务</h3>
+                            <span class="status-badge" id="sovits-status">检测中...</span>
+                        </div>
+                        <div class="card-body">
+                            <div class="info-item">
+                                <span class="label">地址:</span>
+                                <span class="value" id="sovits-url">http://127.0.0.1:9880</span>
+                            </div>
+                            <div class="info-item">
+                                <span class="label">状态:</span>
+                                <span class="value" id="sovits-state">-</span>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- 后端服务 -->
+                    <div class="card">
+                        <div class="card-header">
+                            <h3>⚡ 后端服务</h3>
+                            <span class="status-badge status-success">运行中</span>
+                        </div>
+                        <div class="card-body">
+                            <div class="info-item">
+                                <span class="label">端口:</span>
+                                <span class="value">3000</span>
+                            </div>
+                            <div class="info-item">
+                                <span class="label">API:</span>
+                                <span class="value">/api/admin</span>
+                            </div>
+                        </div>
+                    </div>
+
+
+                    <!-- 版本更新卡片 -->
+                    <div class="card" id="version-card">
+                        <div class="card-header">
+                            <h3>
+                                🔄 版本更新
+                                <span class="update-badge" id="update-badge" style="display: none;"></span>
+                            </h3>
+                            <span class="status-badge" id="version-status">检测中...</span>
+                        </div>
+                        <div class="card-body">
+                            <div class="info-item">
+                                <span class="label">当前版本:</span>
+                                <span class="value" id="current-version">-</span>
+                            </div>
+                            <div class="info-item" id="latest-version-info" style="display: none;">
+                                <span class="label">最新版本:</span>
+                                <span class="value" id="latest-version">-</span>
+                            </div>
+                            <div id="git-repo-notice"
+                                style="display: none; margin-top: 0.5rem; color: #f59e0b; font-size: 0.875rem;">
+                                ⚠️ 检测到 Git 仓库,请使用 git pull 更新
+                            </div>
+                            <div id="update-actions" style="display: none; margin-top: 1rem;">
+                                <button class="btn btn-primary" onclick="performUpdate()" id="update-btn">⬇️
+                                    立即更新</button>
+                            </div>
+                            <div id="update-progress" style="display: none; margin-top: 1rem;">
+                                <div class="progress-bar">
+                                    <div id="version-progress-bar" class="progress-fill"></div>
+                                </div>
+                                <div class="progress-text">
+                                    <span id="version-progress-text">更新中...</span>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- 推理后端 -->
+                <div class="section-header" style="margin-top: 2rem; margin-bottom: 1rem;">
+                    <h3
+                        style="font-size: 1.25rem; color: var(--text-primary); display: flex; align-items: center; gap: 8px;">
+                        🚀 推理后端
+                    </h3>
+                </div>
+
+                <div class="cards-grid">
+                    <!-- GPT-SoVITS 安装配置卡片 -->
+                    <div class="card" id="sovits-install-card" style="grid-column: span 2;">
+                        <div class="card-header">
+                            <h3>📦 GPT-SoVITS 安装配置</h3>
+                            <span class="status-badge" id="sovits-install-status">未配置</span>
+                        </div>
+                        <div class="card-body">
+                            <!-- GPU 类型选择 -->
+                            <div class="form-group">
+                                <label>GPU 类型</label>
+                                <div class="radio-group" id="gpu-type-group">
+                                    <label class="radio-label">
+                                        <input type="radio" name="gpu-type" value="nvidia_general" checked>
+                                        <span>NVIDIA 通用版 (RTX 20/30/40)</span>
+                                    </label>
+                                    <label class="radio-label">
+                                        <input type="radio" name="gpu-type" value="nvidia_50">
+                                        <span>NVIDIA 50系列 (RTX 50)</span>
+                                    </label>
+                                    <label class="radio-label">
+                                        <input type="radio" name="gpu-type" value="amd" disabled>
+                                        <span>AMD 版 (暂未提供)</span>
+                                    </label>
+                                </div>
+                            </div>
+
+                            <!-- 安装路径 -->
+                            <div class="form-group">
+                                <label>GPT-SoVITS 安装路径</label>
+                                <input type="text" id="sovits-install-path" class="input"
+                                    placeholder="例: G:\GPT-SoVITS-v2pro-20250604">
+                                <small>GPT-SoVITS 整合包的根目录（包含 api_v2.py 的目录）</small>
+                            </div>
+
+                            <hr style="border-color: var(--border-color); margin: 1rem 0;">
+
+                            <!-- 自动启动选项 -->
+                            <div class="form-group">
+                                <label style="display: flex; align-items: center; gap: 8px;">
+                                    <input type="checkbox" id="sovits-auto-start" checked>
+                                    <span>启动插件时自动启动 GPT-SoVITS API</span>
+                                </label>
+                            </div>
+
+                            <!-- 操作按钮 -->
+                            <div style="display: flex; gap: 8px; flex-wrap: wrap; margin-top: 1rem;">
+                                <button class="btn btn-success" onclick="saveSovitsConfig()">💾 保存配置</button>
+                                <button class="btn btn-primary" onclick="startSovitsService()">▶️ 启动服务</button>
+                                <button class="btn btn-danger" onclick="stopSovitsService()">⏹️ 停止服务</button>
+                                <button class="btn btn-secondary" onclick="testSovitsConnection()">🧪 测试连接</button>
+                            </div>
+
+                            <hr style="border-color: var(--border-color); margin: 1rem 0;">
+
+                            <!-- 下载链接 -->
+                            <div class="download-links">
+                                <small style="display: block; margin-bottom: 8px; color: var(--text-secondary);">💡
+                                    下载整合包：原作者仓库：https://github.com/RVC-Boss/GPT-SoVITS</small>
+                                <div style="display: flex; gap: 8px; flex-wrap: wrap;">
+                                    <a href="https://www.modelscope.cn/models/FlowerCry/gpt-sovits-7z-pacakges/resolve/master/GPT-SoVITS-v2pro-20250604.7z"
+                                        target="_blank" class="btn btn-secondary" style="font-size: 0.875rem;">
+                                        📥 NVIDIA 通用版
+                                    </a>
+                                    <a href="https://www.modelscope.cn/models/FlowerCry/gpt-sovits-7z-pacakges/resolve/master/GPT-SoVITS-v2pro-20250604-nvidia50.7z"
+                                        target="_blank" class="btn btn-secondary" style="font-size: 0.875rem;">
+                                        📥 NVIDIA 50系列版
+                                    </a>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </section>
+
+            <!-- 模型管理页面 -->
+            <section id="models" class="page">
+                <header class="page-header">
+                    <h2>模型管理</h2>
+                    <button class="btn btn-primary" onclick="showCreateModelDialog()">➕ 创建新模型</button>
+                </header>
+
+                <div class="models-container" id="models-list">
+                    <p class="loading">加载中...</p>
+                </div>
+            </section>
+
+            <!-- 音频管理页面 -->
+            <section id="audios" class="page">
+                <header class="page-header">
+                    <h2>参考音频管理</h2>
+                    <div class="controls">
+                        <select id="audio-model-select" class="select" onchange="loadAudios()">
+                            <option value="">选择模型...</option>
+                        </select>
+                        <button class="btn btn-secondary" onclick="showBatchEmotionDialogFromAudios()"
+                            id="batch-emotion-btn" disabled>🏷️ 批量修改情感</button>
+                        <button class="btn btn-primary" onclick="showUploadDialog()" id="upload-btn" disabled>⬆️
+                            上传音频</button>
+                    </div>
+                </header>
+
+                <div class="audios-container" id="audios-list">
+                    <p class="placeholder">请先选择一个模型</p>
+                </div>
+            </section>
+
+            <!-- 系统配置页面 -->
+            <section id="settings" class="page">
+                <header class="page-header">
+                    <h2>系统配置</h2>
+                    <button class="btn btn-success" onclick="saveSettings()">💾 保存配置</button>
+                </header>
+
+                <!-- Tab 标签栏 -->
+                <div class="settings-tabs">
+                    <button class="settings-tab active" data-tab="basic">📁 基础配置</button>
+                    <button class="settings-tab" data-tab="analysis">🧠 分析引擎</button>
+                    <button class="settings-tab" data-tab="phone">📞 电话功能</button>
+                </div>
+
+                <!-- 基础配置 Tab -->
+                <div id="settings-tab-basic" class="settings-tab-content active">
+                    <div class="settings-form">
+                        <div class="form-group">
+                            <label>模型目录路径</label>
+                            <input type="text" id="setting-base-dir" class="input"
+                                placeholder="例: G:\Models\MyCharacters">
+                            <small>存放 GPT-SoVITS 模型的根目录</small>
+                        </div>
+
+                        <div class="form-group">
+                            <label>缓存目录路径</label>
+                            <input type="text" id="setting-cache-dir" class="input" placeholder="例: G:\Cache">
+                            <small>存放生成音频缓存的目录</small>
+                        </div>
+
+                        <div class="form-group">
+                            <label>GPT-SoVITS API 地址</label>
+                            <input type="text" id="setting-sovits-host" class="input" value="http://127.0.0.1:9880">
+                            <small>GPT-SoVITS 推理服务的 API 地址</small>
+                        </div>
+
+                        <div class="form-group">
+                            <label>默认语言</label>
+                            <select id="setting-default-lang" class="select">
+                                <option value="Chinese">中文</option>
+                                <option value="Japanese">日语</option>
+                                <option value="English">英语</option>
+                            </select>
+                        </div>
+
+                        <h3 class="settings-section-title">📄 消息处理（共享）</h3>
+
+                        <div class="form-group">
+                            <label>消息提取标签</label>
+                            <input type="text" id="setting-extract-tag" class="input" placeholder="例: conxt">
+                            <small>提取特定标签内的内容(如 &lt;conxt&gt;...&lt;/conxt&gt;),留空则不提取</small>
+                        </div>
+
+                        <div class="form-group">
+                            <label>消息过滤标签</label>
+                            <textarea id="setting-filter-tags" class="input" rows="3"
+                                placeholder="例: <small>, [statbar], <thought target=|</thought>"></textarea>
+                            <small>
+                                过滤 chat 消息中的标签内容,支持三种格式:<br>
+                                1. &lt;xxx&gt; - 过滤 HTML 风格标签<br>
+                                2. [xxx] - 过滤方括号风格标签<br>
+                                3. 前缀|后缀 - 过滤自定义前后缀包裹的内容<br>
+                                多个标签用逗号分隔
+                            </small>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- 分析引擎 Tab -->
+                <div id="settings-tab-analysis" class="settings-tab-content">
+                    <div class="settings-form">
+                        <h3 class="settings-section-title">🧠 分析引擎配置</h3>
+
+                        <div class="form-group">
+                            <label>启用分析引擎</label>
+                            <select id="setting-analysis-enabled" class="select">
+                                <option value="true">启用</option>
+                                <option value="false">禁用</option>
+                            </select>
+                            <small>是否启用持续分析功能</small>
+                        </div>
+
+                        <div class="form-group">
+                            <label>分析间隔（楼层）</label>
+                            <input type="number" id="setting-analysis-interval" class="input" min="1" placeholder="3">
+                            <small>每隔多少轮对话触发一次分析</small>
+                        </div>
+
+                        <div class="form-group">
+                            <label>触发阈值</label>
+                            <input type="number" id="setting-analysis-threshold" class="input" min="0" max="100"
+                                placeholder="60">
+                            <small>行动触发的评分阈值 (0-100)影响触发频率</small>
+                        </div>
+
+                        <h3 class="settings-section-title">🤖 分析 LLM 配置</h3>
+
+                        <div class="form-group">
+                            <label>API 地址</label>
+                            <input type="text" id="setting-analysis-llm-api-url" class="input"
+                                placeholder="例: http://127.0.0.1:8045/v1">
+                            <small>用于角色状态分析的 LLM API 地址</small>
+                        </div>
+
+                        <div class="form-group">
+                            <label>API Key</label>
+                            <input type="text" id="setting-analysis-llm-api-key" class="input" placeholder="例: sk-xxx">
+                        </div>
+
+                        <div class="form-group">
+                            <div
+                                style="display:flex; align-items:center; justify-content:space-between; margin-bottom:5px;">
+                                <label>模型</label>
+                                <div style="display:flex; gap:8px;">
+                                    <button type="button" id="test-analysis-llm-btn" class="btn btn-secondary"
+                                        style="padding:4px 12px; font-size:12px;">
+                                        🧪 测试连接
+                                    </button>
+                                    <button type="button" id="fetch-analysis-models-btn" class="btn btn-secondary"
+                                        style="padding:4px 12px; font-size:12px;">
+                                        🔄 获取模型列表
+                                    </button>
+                                </div>
+                            </div>
+                            <select id="setting-analysis-llm-model" class="select">
+                                <option value="">请选择模型...</option>
+                            </select>
+                            <small>用于角色状态分析的 LLM 模型</small>
+                        </div>
+
+                        <div class="form-group">
+                            <label>温度</label>
+                            <input type="number" id="setting-analysis-llm-temperature" class="input" step="0.1" min="0"
+                                max="2" placeholder="0.8">
+                        </div>
+
+                        <div class="form-group">
+                            <label>最大 Token 数</label>
+                            <input type="number" id="setting-analysis-llm-max-tokens" class="input" min="100"
+                                max="32000" placeholder="5000">
+                        </div>
+                    </div>
+                </div>
+
+                <!-- 电话功能 Tab -->
+                <div id="settings-tab-phone" class="settings-tab-content">
+                    <div class="settings-form">
+                        <h3 class="settings-section-title">📞 电话功能</h3>
+
+                        <div class="form-group">
+                            <label>启用电话呼叫</label>
+                            <select id="setting-phone-call-enabled" class="select">
+                                <option value="true">启用</option>
+                                <option value="false">禁用</option>
+                            </select>
+                            <small>是否启用主动电话呼叫功能</small>
+                        </div>
+
+                        <h3 class="settings-section-title">🤖 电话 LLM 配置</h3>
+
+                        <div class="form-group">
+                            <label>LLM API 地址</label>
+                            <input type="text" id="setting-llm-api-url" class="input"
+                                placeholder="例: http://127.0.0.1:7861/v1/chat/completions">
+                            <small>LLM 服务的 API 地址</small>
+                        </div>
+
+                        <div class="form-group">
+                            <label>LLM API Key</label>
+                            <input type="text" id="setting-llm-api-key" class="input" placeholder="例: pwd">
+                            <small>LLM 服务的 API 密钥</small>
+                        </div>
+
+                        <div class="form-group">
+                            <div
+                                style="display:flex; align-items:center; justify-content:space-between; margin-bottom:5px;">
+                                <label>LLM 模型</label>
+                                <div style="display:flex; gap:8px;">
+                                    <button type="button" id="test-llm-connection-btn" class="btn btn-secondary"
+                                        style="padding:4px 12px; font-size:12px;">
+                                        🧪 测试连接
+                                    </button>
+                                    <button type="button" id="fetch-llm-models-btn" class="btn btn-secondary"
+                                        style="padding:4px 12px; font-size:12px;">
+                                        🔄 获取模型列表
+                                    </button>
+                                </div>
+                            </div>
+                            <select id="setting-llm-model" class="select">
+                                <option value="">请选择模型...</option>
+                            </select>
+                            <small>使用的 LLM 模型名称,点击上方按钮从 API 获取可用模型</small>
+                        </div>
+
+                        <div class="form-group">
+                            <label>LLM 温度</label>
+                            <input type="number" id="setting-llm-temperature" class="input" step="0.1" min="0" max="2"
+                                placeholder="0.8">
+                            <small>控制生成文本的随机性 (0.0-2.0)</small>
+                        </div>
+
+                        <div class="form-group">
+                            <label>LLM 最大 Token 数</label>
+                            <input type="number" id="setting-llm-max-tokens" class="input" min="100" max="32000"
+                                placeholder="5000">
+                            <small>LLM 生成的最大 Token 数量 (默认: 5000)</small>
+                        </div>
+
+                        <h3 class="settings-section-title">🎙️ TTS 配置</h3>
+
+                        <div class="form-group">
+                            <label>文本语言</label>
+                            <select id="setting-tts-text-lang" class="select">
+                                <option value="zh">中文 (zh)</option>
+                                <option value="en">英语 (en)</option>
+                                <option value="ja">日语 (ja)</option>
+                            </select>
+                            <small>生成语音的文本语言</small>
+                        </div>
+
+                        <div class="form-group">
+                            <label>提示语言</label>
+                            <select id="setting-tts-prompt-lang" class="select">
+                                <option value="zh">中文 (zh)</option>
+                                <option value="en">英语 (en)</option>
+                                <option value="ja">日语 (ja)</option>
+                            </select>
+                            <small>提示词的语言</small>
+                        </div>
+
+                        <div class="form-group">
+                            <label>文本分割方法</label>
+                            <select id="setting-tts-text-split-method" class="select">
+                                <option value="cut0">cut0 - 不分割</option>
+                                <option value="cut1">cut1 - 按标点分割</option>
+                                <option value="cut2">cut2 - 按句子分割</option>
+                                <option value="cut3">cut3 - 按段落分割</option>
+                                <option value="cut4">cut4 - 按长度分割</option>
+                                <option value="cut5">cut5 - 智能分割</option>
+                            </select>
+                            <small>文本分割策略</small>
+                        </div>
+
+                        <div class="form-group">
+                            <label>使用辅助参考音频</label>
+                            <select id="setting-tts-use-aux-ref-audio" class="select">
+                                <option value="false">否</option>
+                                <option value="true">是</option>
+                            </select>
+                            <small>使用辅助音频，让情绪转换的时候更加自然，但偶尔也会失真</small>
+                        </div>
+
+                        <!-- 
+                        ========== 已废弃：自动生成现由分析引擎控制 ==========
+                        <h3 class="settings-section-title">🤖 自动生成配置</h3>
+
+                        <div class="form-group">
+                            <label>楼层间隔</label>
+                            <input type="number" id="setting-auto-floor-interval" class="input" min="1" placeholder="3">
+                            <small>每隔多少条消息触发一次自动生成(这里指的是轮次，即AI回复)</small>
+                        </div>
+
+                        <div class="form-group">
+                            <label>起始楼层</label>
+                            <input type="number" id="setting-auto-start-floor" class="input" min="1" placeholder="3">
+                            <small>从第几条消息开始触发自动生成(这里指的是轮次，即AI回复)</small>
+                        </div>
+
+                        <div class="form-group">
+                            <label>最大上下文消息数</label>
+                            <input type="number" id="setting-auto-max-context-messages" class="input" min="1"
+                                placeholder="10">
+                            <small>自动生成时使用的最大上下文消息数量</small>
+                        </div>
+                        -->
+                    </div>
+                </div>
+            </section>
+
+
+        </main>
+    </div>
+
+    <!-- 创建模型对话框 -->
+    <div id="create-model-dialog" class="dialog-overlay" style="display: none;">
+        <div class="dialog">
+            <div class="dialog-header">
+                <h3>创建新模型</h3>
+                <button class="close-btn" onclick="closeDialog('create-model-dialog')">✕</button>
+            </div>
+            <div class="dialog-body">
+                <div class="form-group">
+                    <label>模型名称</label>
+                    <input type="text" id="new-model-name" class="input" placeholder="例: 阿米娅">
+                    <small>将自动创建标准目录结构</small>
+                </div>
+
+                <div class="form-group">
+                    <label>GPT 模型文件 (可选)</label>
+                    <input type="file" id="gpt-model-file" class="input" accept=".ckpt"
+                        onchange="previewModelFile('gpt')">
+                    <small>选择 .ckpt 文件,将自动复制到模型文件夹</small>
+                    <div id="gpt-file-preview" class="file-preview" style="display: none;">
+                        <span class="file-info"></span>
+                        <button type="button" class="btn-clear" onclick="clearModelFile('gpt')">✕</button>
+                    </div>
+                </div>
+
+                <div class="form-group">
+                    <label>SoVITS 模型文件 (可选)</label>
+                    <input type="file" id="sovits-model-file" class="input" accept=".pth"
+                        onchange="previewModelFile('sovits')">
+                    <small>选择 .pth 文件,将自动复制到模型文件夹</small>
+                    <div id="sovits-file-preview" class="file-preview" style="display: none;">
+                        <span class="file-info"></span>
+                        <button type="button" class="btn-clear" onclick="clearModelFile('sovits')">✕</button>
+                    </div>
+                </div>
+
+                <!-- 上传进度条 -->
+                <div id="upload-progress-container" class="progress-container" style="display: none;">
+                    <div class="progress-bar">
+                        <div id="upload-progress-bar" class="progress-fill"></div>
+                    </div>
+                    <div class="progress-text">
+                        <span id="upload-progress-text">上传中...</span>
+                        <span id="upload-progress-percent">0%</span>
+                    </div>
+                </div>
+            </div>
+            <div class="dialog-footer">
+                <button class="btn btn-secondary" onclick="closeDialog('create-model-dialog')">取消</button>
+                <button class="btn btn-primary" id="create-model-btn" onclick="createModel()">创建</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- 上传音频对话框 -->
+    <div id="upload-dialog" class="dialog-overlay" style="display: none;">
+        <div class="dialog">
+            <div class="dialog-header">
+                <h3>上传参考音频</h3>
+                <button class="close-btn" onclick="closeDialog('upload-dialog')">✕</button>
+            </div>
+            <div class="dialog-body">
+                <div class="form-group">
+                    <label>语言</label>
+                    <select id="upload-language" class="select">
+                        <option value="Chinese">中文</option>
+                        <option value="Japanese">日语</option>
+                        <option value="English">英语</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label>情感标签</label>
+                    <input type="text" id="upload-emotion" class="input" placeholder="例: happy, sad, angry"
+                        value="default">
+                </div>
+                <div class="form-group">
+                    <label>音频文件</label>
+                    <input type="file" id="upload-file" class="input" accept=".wav,.mp3,.ogg,.flac">
+                </div>
+            </div>
+            <div class="dialog-footer">
+                <button class="btn btn-secondary" onclick="closeDialog('upload-dialog')">取消</button>
+                <button class="btn btn-primary" onclick="uploadAudio()">上传</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- 重命名音频对话框 -->
+    <div id="rename-audio-dialog" class="dialog-overlay" style="display: none;">
+        <div class="dialog">
+            <div class="dialog-header">
+                <h3>重命名音频</h3>
+                <button class="close-btn" onclick="closeDialog('rename-audio-dialog')">✕</button>
+            </div>
+            <div class="dialog-body">
+                <div class="form-group">
+                    <label>新文件名</label>
+                    <input type="text" id="rename-new-filename" class="input" placeholder="例: happy_你好.wav">
+                    <small>可以包含正常标点符号,文件名即为音频字幕内容</small>
+                </div>
+            </div>
+            <div class="dialog-footer">
+                <button class="btn btn-secondary" onclick="closeDialog('rename-audio-dialog')">取消</button>
+                <button class="btn btn-primary" onclick="confirmRename()">确认</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- 批量修改情感对话框 -->
+    <div id="batch-emotion-dialog" class="dialog-overlay" style="display: none;">
+        <div class="dialog">
+            <div class="dialog-header">
+                <h3>批量修改情感前缀</h3>
+                <button class="close-btn" onclick="closeDialog('batch-emotion-dialog')">✕</button>
+            </div>
+            <div class="dialog-body">
+                <div class="form-group">
+                    <label>旧情感标签</label>
+                    <input type="text" id="batch-old-emotion" class="input" placeholder="例: happy">
+                    <small>将匹配所有以 "旧情感_" 开头的文件</small>
+                </div>
+                <div class="form-group">
+                    <label>新情感标签</label>
+                    <input type="text" id="batch-new-emotion" class="input" placeholder="例: joyful">
+                    <small>将替换为 "新情感_" 前缀</small>
+                </div>
+            </div>
+            <div class="dialog-footer">
+                <button class="btn btn-secondary" onclick="closeDialog('batch-emotion-dialog')">取消</button>
+                <button class="btn btn-primary" onclick="confirmBatchEmotion()">确认</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- 通告对话框 -->
+    <div id="notice-dialog" class="dialog-overlay" style="display: none;">
+        <div class="dialog">
+            <div class="dialog-header">
+                <h3>📢 重要通知</h3>
+            </div>
+            <div class="dialog-body">
+                <div class="notice-content" style="line-height: 1.8; color: var(--text-primary);">
+                    <p>欢迎使用 SillyTavern GPT-SoVITS 管理面板！</p>
+                    <p style="color: #ff4757; font-size: 1.2em; font-weight: bold;">本插件永久免费，包括模型资源！如果你用到了需要收费的，请加群联系作者！
+                    </p>
+                    <p>V2.0版本 情感引擎已上线！多人对话！</p>
+                    <p>请前往系统配置完成设置后使用：</p>
+                    <ul style="padding-left: 20px; margin: 10px 0;">
+                        <li>确认填好api与密钥</li>
+                        <li>测试连接是否正常，保存设置</li>
+                    </ul>
+                    <div
+                        style="margin-top: 15px; padding: 12px; background: rgba(0, 217, 255, 0.1); border: 1px solid rgba(0, 217, 255, 0.2); border-radius: 8px; text-align: center;">
+                        <p
+                            style="margin: 0; font-size: 1.1em; font-weight: bold; color: #00d9ff; text-shadow: 0 0 10px rgba(0, 217, 255, 0.3);">
+                            🎉 欢迎加入作者大本营Q群：571745067
+                        </p>
+                        <p style="margin: 5px 0 0; font-size: 0.9em; color: var(--text-secondary);">
+                            免费模型分享 · 版本通知 · 日常交流
+                        </p>
+                    </div>
+                </div>
+            </div>
+            <div class="dialog-footer">
+                <button class="btn btn-primary" onclick="closeDialog('notice-dialog')">我知道了</button>
+            </div>
+        </div>
+    </div>
+
+    <script src="js/admin.js"></script>
+</body>
+
+</html>
